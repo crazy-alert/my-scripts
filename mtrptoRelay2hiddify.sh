@@ -144,29 +144,30 @@ EOF
 cat > docker-compose.yml <<EOF
 services:
   hiddify-client:
-    image: ghcr.io/hiddify/hiddify-core:latest
+    image: hiddify/hiddify-core:latest
     container_name: hiddify-client
     restart: unless-stopped
     volumes:
-      - ./hiddify-config.json:/app/config/config.json
+      - ./hiddify-config.json:/opt/hiddify-config/config.json
     environment:
-      - CONFIG=file:///app/config/config.json
+      - HIDDIFY_CONFIG=/opt/hiddify-config/config.json
     networks:
       - proxy-net
-  
+
   mtproto-proxy:
     image: telegrammessenger/proxy:latest
     container_name: mtproto-proxy
     restart: unless-stopped
     ports:
-      - "${PROXY_PORT}:1443"
+      - "${PROXY_PORT}:443"
     environment:
       - SECRET=${SECRET}
-    command: |
-      -p ${PROXY_PORT}
-      -S ${SECRET}
-      --proxy=socks5://hiddify-client:1080
-      -M 2
+    command: >
+      sh -c "mtproto-proxy 
+      -p 443 
+      -S ${SECRET} 
+      --proxy=socks5://hiddify-client:1080 
+      -M 2"
     networks:
       - proxy-net
     depends_on:
