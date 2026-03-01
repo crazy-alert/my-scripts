@@ -153,25 +153,24 @@ services:
       - CONFIG=file:///app/config/config.json
     networks:
       - proxy-net
-
+  
   mtproto-proxy:
     image: telegrammessenger/proxy:latest
     container_name: mtproto-proxy
     restart: unless-stopped
-    env_file:
-      - .env
     ports:
-      - "${PROXY_PORT}:${PROXY_PORT}"
+      - "${PROXY_PORT}:1443"
     environment:
       - SECRET=${SECRET}
-    volumes:
-      - ./mtproto-config.toml:/mtproto-config.toml
-    command: sh -c "cat /config.toml && mtproto-proxy --config=/config.toml"
+    command: |
+      -p ${PROXY_PORT}
+      -S ${SECRET}
+      --proxy=socks5://hiddify-client:1080
+      -M 2
     networks:
       - proxy-net
     depends_on:
       - hiddify-client
-
 
 networks:
   proxy-net:
