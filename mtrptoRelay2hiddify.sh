@@ -142,8 +142,6 @@ EOF
 
 # Создание docker-compose.yml
 cat > docker-compose.yml <<EOF
-version: '3.8'
-
 services:
   hiddify-client:
     image: ghcr.io/hiddify/hiddify-core:latest
