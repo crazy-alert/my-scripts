@@ -161,14 +161,14 @@ services:
     ports:
       - "${PROXY_PORT}:${PROXY_PORT}"
     environment:
-      - SECRET=\${SECRET}
+      - SECRET=${SECRET}
     volumes:
-      - ./mtproto-config.toml:/config.toml
-    command: --config=/config.toml
+      - ./mtproto-config.toml:/etc/mtproto-proxy/config.toml
+    command: --config=/etc/mtproto-proxy/config.toml
     networks:
       - proxy-net
     depends_on:
-      - hiddify-client
+    - hiddify-client
 
 networks:
   proxy-net:
@@ -176,7 +176,8 @@ networks:
 EOF
 
 # Создание .env файла
-echo "SECRET=${SECRET_KEY}" > .env
+echo "SECRET=${SECRET_KEY}
+PROXY_PORT=${PROXY_PORT}" > .env
 
 # Получение внешнего IP
 SERVER_IP=$(curl -s ifconfig.me)
