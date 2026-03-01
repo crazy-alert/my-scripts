@@ -8,8 +8,24 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Папка установки по умолчанию
+DEFAULT_INSTALL_DIR="${HOME}/telegram-via-hiddify"
+
 echo -e "${GREEN}🚀 Начинаем интерактивную установку Telegram Proxy через Hiddify${NC}"
 echo ""
+
+# Запрос папки установки
+echo -e "${YELLOW}📂 Введите путь для установки (по умолчанию: ${DEFAULT_INSTALL_DIR}):${NC}"
+read -p "👉 " INSTALL_DIR
+if [ -z "$INSTALL_DIR" ]; then
+    INSTALL_DIR="${DEFAULT_INSTALL_DIR}"
+    echo -e "${BLUE}Используется папка по умолчанию: ${INSTALL_DIR}${NC}"
+else
+    echo -e "${GREEN}Выбрана папка: ${INSTALL_DIR}${NC}"
+fi
+
+# Создание папки установки (если не существует)
+mkdir -p "${INSTALL_DIR}"
 
 # Запрос ссылки на подписку
 echo -e "${YELLOW}📋 Введите вашу ссылку на подписку Hiddify (remote_url):${NC}"
@@ -74,14 +90,11 @@ sudo usermod -aG docker $USER
 echo -e "${YELLOW}🔥 Настройка файрвола...${NC}"
 sudo ufw --force enable
 sudo ufw allow 22/tcp
-sudo ufw allow 443/tcp
 sudo ufw allow ${PROXY_PORT}/tcp
 sudo ufw allow 80/tcp
-sudo ufw allow 1080/tcp
 
-# Создание рабочей директории
-mkdir -p ~/telegram-via-hiddify
-cd ~/telegram-via-hiddify
+# Переход в папку установки
+cd "${INSTALL_DIR}"
 
 # Генерация секретного ключа
 SECRET_KEY=$(openssl rand -hex 16)
@@ -173,17 +186,19 @@ SERVER_IP=$(curl -s ifconfig.me)
 echo ""
 echo -e "${GREEN}✅ ========== УСТАНОВКА ЗАВЕРШЕНА ==========${NC}"
 echo -e "${GREEN}📋 Ваши данные для подключения:${NC}"
+echo -e "${YELLOW}📂 Папка установки:${NC} ${INSTALL_DIR}"
 echo -e "${YELLOW}🌐 IP сервера:${NC} ${SERVER_IP}"
 echo -e "${YELLOW}🔌 Порт:${NC} ${PROXY_PORT}"
 echo -e "${YELLOW}🔑 Секретный ключ:${NC} ${SECRET_KEY}"
 echo -e "${YELLOW}📡 Ссылка подписки Hiddify:${NC} ${HIDDIFY_URL}"
 echo ""
-echo -e "${BLUE}🔗 Ссылка для Telegram (нажмите, чтобы скопировать):${NC}"
+echo -e "${BLUE}🔗 Ссылка для Telegram:${NC}"
 echo "tg://proxy?server=${SERVER_IP}&port=${PROXY_PORT}&secret=${SECRET_KEY}"
 echo ""
 echo -e "${YELLOW}👉 Дальнейшие действия:${NC}"
 echo "1. Выполните команду: newgrp docker (или перелогиньтесь)"
-echo "2. Запустите контейнеры: cd ~/telegram-via-hiddify && docker-compose up -d"
-echo "3. Проверьте логи: docker-compose logs -f"
+echo "2. Перейдите в папку установки: cd ${INSTALL_DIR}"
+echo "3. Запустите контейнеры: docker-compose up -d"
+echo "4. Проверьте логи: docker-compose logs -f"
 echo ""
 echo -e "${GREEN}🎉 Готово! Скопируйте ссылку выше и отправьте себе в Telegram${NC}"
