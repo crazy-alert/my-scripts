@@ -74,8 +74,10 @@ sudo usermod -aG docker $USER
 echo -e "${YELLOW}🔥 Настройка файрвола...${NC}"
 sudo ufw --force enable
 sudo ufw allow 22/tcp
+sudo ufw allow 443/tcp
 sudo ufw allow ${PROXY_PORT}/tcp
 sudo ufw allow 80/tcp
+sudo ufw allow 1080/tcp
 
 # Создание рабочей директории
 mkdir -p ~/telegram-via-hiddify
