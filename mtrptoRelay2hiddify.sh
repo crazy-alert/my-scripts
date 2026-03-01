@@ -158,17 +158,20 @@ services:
     image: telegrammessenger/proxy:latest
     container_name: mtproto-proxy
     restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "${PROXY_PORT}:${PROXY_PORT}"
     environment:
       - SECRET=${SECRET}
     volumes:
-      - ./mtproto-config.toml:/etc/mtproto-proxy/config.toml
-    command: --config=/etc/mtproto-proxy/config.toml
+      - ./mtproto-config.toml:/mtproto-config.toml
+    command: sh -c "cat /config.toml && mtproto-proxy --config=/config.toml"
     networks:
       - proxy-net
     depends_on:
-    - hiddify-client
+      - hiddify-client
+
 
 networks:
   proxy-net:
