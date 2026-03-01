@@ -9,7 +9,8 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Папка установки по умолчанию
-DEFAULT_INSTALL_DIR="${HOME}/telegram-via-hiddify"
+DEFAULT_INSTALL_DIR="/opt/telegram-via-hiddify"
+#1111
 
 echo -e "${GREEN}🚀 Начинаем интерактивную установку Telegram Proxy через Hiddify${NC}"
 echo ""
