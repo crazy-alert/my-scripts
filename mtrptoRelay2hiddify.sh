@@ -120,7 +120,7 @@ EOF
 # Создание docker-compose.yml
 cat > docker-compose.yml <<EOF
 services:
-  hiddify-client:
+ hiddify-client:
     image: ghcr.io/hiddify/hiddify-core:latest
     container_name: hiddify-client
     restart: unless-stopped
@@ -128,7 +128,6 @@ services:
       - CONFIG=${HIDDIFY_URL}
     networks:
       - proxy-net
-    command: ["/hiddify/hiddify.sh"]
 
   mtproto-proxy:
     image: telegrammessenger/proxy:latest
