@@ -1,152 +1,58 @@
-#!/bin/bash
-set -e
+SECRET_KEY=$(openssl rand -hex 16 | tr -d '\n' | tr -d ' ')
+PROXY_PORT=1443
+HIDDIFY_URL=https://sub.kleomars.top/4upKJvqjmyZ5RJK0hgWb/2e34fb55-eec9-46d2-8528-c65cd87754da/#MTProto
 
-# Цвета для вывода
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+docker-compose down
+docker rm -f hiddify-client 2>/dev/null
+rm -f docker-compose.yml .env hiddify-config.json mtproto-config.toml
 
-
-# Папка установки по умолчанию
-DEFAULT_INSTALL_DIR="/opt/telegram-via-hiddify"
-
-echo -e "${GREEN}🚀 Начинаем интерактивную установку Telegram Proxy через Hiddify${NC}"
-echo ""
-
-# Запрос папки установки
-echo -e "${YELLOW}📂 Введите путь для установки (по умолчанию: ${DEFAULT_INSTALL_DIR}):${NC}"
-read -p "👉 " INSTALL_DIR
-if [ -z "$INSTALL_DIR" ]; then
-    INSTALL_DIR="${DEFAULT_INSTALL_DIR}"
-    echo -e "${BLUE}Используется папка по умолчанию: ${INSTALL_DIR}${NC}"
-else
-    echo -e "${GREEN}Выбрана папка: ${INSTALL_DIR}${NC}"
-fi
-
-# Создание папки установки
-mkdir -p "${INSTALL_DIR}"
-
-# Запрос ссылки на подписку
-echo -e "${YELLOW}📋 Введите вашу ссылку на подписку Hiddify (remote_url):${NC}"
-echo -e "${BLUE}Пример: https://your-hiddify-server.com/subscription/path/your-uuid${NC}"
-read -p "👉 " HIDDIFY_URL
-
-if [ -z "$HIDDIFY_URL" ]; then
-    echo -e "${RED}❌ Ошибка: ссылка не может быть пустой. Скрипт прерван.${NC}"
-    exit 1
-fi
-
-# Запрос порта
-echo -e "${YELLOW}🔌 Введите порт для Telegram Proxy (по умолчанию 443):${NC}"
-read -p "👉 " PROXY_PORT
-if [ -z "$PROXY_PORT" ]; then
-    PROXY_PORT=443
-    echo -e "${BLUE}Используется порт по умолчанию: ${PROXY_PORT}${NC}"
-else
-    echo -e "${GREEN}Выбран порт: ${PROXY_PORT}${NC}"
-fi
-
-echo -e "${GREEN}✅ Ссылка принята: ${HIDDIFY_URL}${NC}"
-echo ""
-
-# Обновление системы
-echo -e "${YELLOW}📦 Обновление системы...${NC}"
-sudo apt update && sudo apt upgrade -y
-
-# Установка зависимостей
-echo -e "${YELLOW}📦 Установка зависимостей...${NC}"
-sudo apt install -y \
-    apt-transport-https \
-    ca-certificates \
-    curl \
-    software-properties-common \
-    git \
-    wget \
-    htop \
-    net-tools \
-    telnet \
-    ufw \
-    openssl \
-    jq \
-    vim \
-    nano
-
-# Установка Docker
-echo -e "${YELLOW}🐳 Установка Docker...${NC}"
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-
-# Установка Docker Compose
-echo -e "${YELLOW}📦 Установка Docker Compose...${NC}"
-sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
-
-# Добавление пользователя в группу docker
-sudo usermod -aG docker $USER
-
-# Настройка файрвола
-echo -e "${YELLOW}🔥 Настройка файрвола...${NC}"
-sudo ufw --force enable
-sudo ufw allow 22/tcp
-sudo ufw allow ${PROXY_PORT}/tcp
-sudo ufw allow 80/tcp
-
-# Переход в папку установки
-cd "${INSTALL_DIR}"
-
-# Генерация секретного ключа
-SECRET_KEY=$(openssl rand -hex 16)
-echo -e "${GREEN}🔑 Сгенерирован секретный ключ: ${SECRET_KEY}${NC}"
-
-# Создание конфига Hiddify
-echo -e "${YELLOW}⚙️ Создание конфигурации Hiddify...${NC}"
-cat > hiddify-config.json <<EOF
-{
-  "configs": ["${HIDDIFY_URL}"],
-  "mode": "client",
-  "socks_port": 1080
-}
+cat > .env <<EOF
+SECRET=${SECRET_KEY}
+HIDDIFY_URL=${HIDDIFY_URL}
+PROXY_PORT=${PROXY_PORT}
 EOF
 
-# Создание конфига MTProto
-cat > mtproto-config.toml <<EOF
-listen = "0.0.0.0:${PROXY_PORT}"
-proxy = "socks5://hiddify-client:1080"
-workers = 2
+cat > mtproto.conf <<EOF
+proxy hiddify:1080;
+port ${PROXY_PORT};
+secret ${SECRET_KEY};
+workers 2
 EOF
 
-# Создание docker-compose.yml
-cat > docker-compose.yml <<EOF
+cat > docker-compose.yml <<'EOF'
 services:
- hiddify-client:
-    image: ghcr.io/hiddify/hiddify-core:latest
-    container_name: hiddify-client
+  hiddify:
+    image: alpine:latest
+    container_name: hiddify
     restart: unless-stopped
+    command: >
+      sh -c "
+      apk add --no-cache curl wget &&
+      wget -O /tmp/sing-box.tar.gz https://github.com/SagerNet/sing-box/releases/download/v1.8.0/sing-box-1.8.0-linux-amd64.tar.gz &&
+      tar -xzf /tmp/sing-box.tar.gz -C /tmp/ &&
+      mv /tmp/sing-box-1.8.0-linux-amd64/sing-box /usr/local/bin/ &&
+      rm -rf /tmp/sing-box* &&
+      curl -sL $${HIDDIFY_URL} -o /etc/sing-box/config.json &&
+      /usr/local/bin/sing-box run -c /etc/sing-box/config.json
+      "
     environment:
-      - CONFIG=${HIDDIFY_URL}
+      - HIDDIFY_URL=${HIDDIFY_URL}
     networks:
       - proxy-net
 
-  mtproto-proxy:
+  mtproto:
     image: telegrammessenger/proxy:latest
-    container_name: mtproto-proxy
+    container_name: mtproto
     restart: unless-stopped
     ports:
       - "${PROXY_PORT}:${PROXY_PORT}"
-    environment:
-      - SECRET=${SECRET}
-    command: >
-      sh -c "mtproto-proxy
-      -p ${PROXY_PORT}
-      -S ${SECRET}
-      --proxy=socks5://hiddify-client:1080
-      -M 2"
+    volumes:
+      - ./mtproto.conf:/mtproto.conf
+    command: mtproto-proxy /mtproto.conf
     networks:
       - proxy-net
     depends_on:
-      - hiddify-client
+      - hiddify
 
 networks:
   proxy-net:
@@ -154,30 +60,8 @@ networks:
 EOF
 
 
-# Создание .env файла
-echo "SECRET=${SECRET_KEY}
-HIDDIFY_URL=${HIDDIFY_URL}
-PROXY_PORT=${PROXY_PORT}" > .env
+echo "🔗 Ссылка для Telegram:"
+echo "tg://proxy?server=$(curl -s ifconfig.me)&port=${PROXY_PORT}&secret=${SECRET_KEY}"
+echo ""
 
-# Получение внешнего IP
-SERVER_IP=$(curl -s ifconfig.me)
-
-echo ""
-echo -e "${GREEN}✅ ========== УСТАНОВКА ЗАВЕРШЕНА ==========${NC}"
-echo -e "${GREEN}📋 Ваши данные для подключения:${NC}"
-echo -e "${YELLOW}📂 Папка установки:${NC} ${INSTALL_DIR}"
-echo -e "${YELLOW}🌐 IP сервера:${NC} ${SERVER_IP}"
-echo -e "${YELLOW}🔌 Порт:${NC} ${PROXY_PORT}"
-echo -e "${YELLOW}🔑 Секретный ключ:${NC} ${SECRET_KEY}"
-echo -e "${YELLOW}📡 Ссылка подписки Hiddify:${NC} ${HIDDIFY_URL}"
-echo ""
-echo -e "${BLUE}🔗 Ссылка для Telegram:${NC}"
-echo "tg://proxy?server=${SERVER_IP}&port=${PROXY_PORT}&secret=${SECRET_KEY}"
-echo ""
-echo -e "${YELLOW}👉 Дальнейшие действия:${NC}"
-echo "1. Выполните команду: newgrp docker (или перелогиньтесь)"
-echo "2. Перейдите в папку установки: cd ${INSTALL_DIR}"
-echo "3. Запустите контейнеры: docker-compose up -d"
-echo "4. Проверьте логи: docker-compose logs -f"
-echo ""
-echo -e "${GREEN}🎉 Готово! Скопируйте ссылку выше и отправьте себе в Telegram${NC}"
+docker-compose up -d && docker-compose logs -f
