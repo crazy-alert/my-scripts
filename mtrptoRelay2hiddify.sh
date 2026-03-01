@@ -104,32 +104,9 @@ echo -e "${GREEN}🔑 Сгенерирован секретный ключ: ${SE
 echo -e "${YELLOW}⚙️ Создание конфигурации Hiddify...${NC}"
 cat > hiddify-config.json <<EOF
 {
-  "service-mode": "client",
-  "log-level": "info",
-  "allow-connection-from-lan": true,
-  "inbounds": [
-    {
-      "type": "socks",
-      "tag": "socks-in",
-      "listen": "0.0.0.0",
-      "listen_port": 1080
-    }
-  ],
-  "outbounds": [
-    {
-      "type": "remote",
-      "tag": "remote",
-      "remote_url": "${HIDDIFY_URL}"
-    }
-  ],
-  "route": {
-    "rules": [
-      {
-        "inbound": ["socks-in"],
-        "outbound": "remote"
-      }
-    ]
-  }
+  "configs": ["${HIDDIFY_URL}"],
+  "mode": "client",
+  "socks_port": 1080
 }
 EOF
 
@@ -144,29 +121,28 @@ EOF
 cat > docker-compose.yml <<EOF
 services:
   hiddify-client:
-    image: hiddify/hiddify-core:latest
+    image: ghcr.io/hiddify/hiddify-core:latest
     container_name: hiddify-client
     restart: unless-stopped
-    volumes:
-      - ./hiddify-config.json:/opt/hiddify-config/config.json
     environment:
-      - HIDDIFY_CONFIG=/opt/hiddify-config/config.json
+      - CONFIG=${HIDDIFY_URL}
     networks:
       - proxy-net
+    command: ["/hiddify/hiddify.sh"]
 
   mtproto-proxy:
     image: telegrammessenger/proxy:latest
     container_name: mtproto-proxy
     restart: unless-stopped
     ports:
-      - "${PROXY_PORT}:443"
+      - "${PROXY_PORT}:${PROXY_PORT}"
     environment:
       - SECRET=${SECRET}
     command: >
-      sh -c "mtproto-proxy 
-      -p 443 
-      -S ${SECRET} 
-      --proxy=socks5://hiddify-client:1080 
+      sh -c "mtproto-proxy
+      -p ${PROXY_PORT}
+      -S ${SECRET}
+      --proxy=socks5://hiddify-client:1080
       -M 2"
     networks:
       - proxy-net
@@ -180,6 +156,7 @@ EOF
 
 # Создание .env файла
 echo "SECRET=${SECRET_KEY}
+HIDDIFY_URL=${HIDDIFY_URL}
 PROXY_PORT=${PROXY_PORT}" > .env
 
 # Получение внешнего IP
