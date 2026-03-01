@@ -5,7 +5,7 @@
 ![Docker](https://img.shields.io/badge/docker-required-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-**Одна команда — полноценный Telegram Proxy, который ходит в интернет через ваш Hiddify-сервер**
+**Одна команда — полноценный Telegram MTProto Proxy, который ходит в интернет через ваш Hiddify-сервер**
 
  Установка одной командой
 ```bash
