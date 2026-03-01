@@ -9,6 +9,6 @@
 
  Установка одной командой
 ```bash
-curl -sSL https://raw.githubusercontent.com/crazy-alert/my-scripts/refs/heads/main/mtrptoRelay2hiddify.sh) | bash
+curl -sSL https://raw.githubusercontent.com/crazy-alert/my-scripts/refs/heads/main/mtrptoRelay2hiddify.sh | bash
 ```
 
