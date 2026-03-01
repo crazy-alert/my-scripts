@@ -154,6 +154,7 @@ networks:
     driver: bridge
 EOF
 
+
 # Создание .env файла
 echo "SECRET=${SECRET_KEY}
 HIDDIFY_URL=${HIDDIFY_URL}
