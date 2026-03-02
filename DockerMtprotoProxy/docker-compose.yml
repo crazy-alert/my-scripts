@@ -1,0 +1,22 @@
+services:
+  mtproto-proxy:
+    image: telegrammessenger/proxy:latest
+    container_name: mtproto-proxy2
+    restart: always
+    ports:
+      - "2443:443"  # внешний порт: внутренний порт (443)
+    environment:
+      # Основные настройки (обязательно указать SECRET)
+      - SECRET=5221c756b40ecc66843a38fada4de5ef # 32 hex символа, если не задан в .env - ошибка
+      - WORKERS=2 # количество воркеров
+      # Дополнительно: если нужно несколько секретов
+      - SECRET_COUNT=1 # количество генерируемых секретов (если не задан SECRET)
+      # Тег для монетизации/статистики (если есть)
+      - TAG=b2f48ef814f41d126be98d2845e680fa
+      # Вышестоящий прокси (если нужно)
+#      - PROXY=socks5://host.docker.internal:444
+#      - HTTP_PROXY=http://host.docker.internal:444
+#      - HTTPS_PROXY=http://host.docker.internal:444
+#      - NO_PROXY=${NO_PROXY:-localhost,127.0.0.1}
+    volumes:
+      - ./data:/data   # том для хранения секретов (persistent)

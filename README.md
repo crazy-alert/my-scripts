@@ -7,8 +7,14 @@
 
 **Одна команда — полноценный Telegram MTProto Proxy, который ходит в интернет через ваш Hiddify-сервер**
 
- Установка одной командой
+ Установка:
 ```bash
 curl -sSL https://raw.githubusercontent.com/crazy-alert/my-scripts/refs/heads/main/mtrptoRelay2hiddify.sh | bash
 ```
 
+**Relay для Hiddify сервера**
+
+ Установка одной командой
+```bash
+bash -c "$(curl -L https://raw.githubusercontent.com/hiddify/hiddify-relay/main/install.sh)"
+```
