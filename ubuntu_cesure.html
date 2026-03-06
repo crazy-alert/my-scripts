@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Инструкция: Настройка безопасности Ubuntu (SSH, fail2ban, ufw)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: #f6f8fa;
+            color: #24292e;
+            line-height: 1.6;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+        h1 {
+            font-size: 2.2em;
+            margin-bottom: 0.5em;
+            border-bottom: 2px solid #e1e4e8;
+            padding-bottom: 0.3em;
+        }
+        h2 {
+            font-size: 1.5em;
+            margin: 1.5em 0 0.8em;
+            color: #0366d6;
+        }
+        p {
+            margin-bottom: 1.2em;
+        }
+        .note {
+            background-color: #fff5b1;
+            border-left: 6px solid #f9c513;
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-weight: 500;
+        }
+        .warning {
+            background-color: #ffe3e6;
+            border-left: 6px solid #d73a49;
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-weight: 500;
+        }
+        .code-block {
+            position: relative;
+            margin: 20px 0;
+            background-color: #1e1e1e;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .code-block pre {
+            margin: 0;
+            padding: 18px 20px;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #2d2d2d;
+            color: #cccccc;
+            border: 1px solid #444;
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .copy-btn:hover {
+            background-color: #3d3d3d;
+            color: #ffffff;
+            border-color: #666;
+        }
+        .copy-btn.copied {
+            background-color: #238636;
+            color: #ffffff;
+            border-color: #2ea043;
+        }
+        hr {
+            border: none;
+            border-top: 1px solid #e1e4e8;
+            margin: 30px 0;
+        }
+        footer {
+            margin-top: 40px;
+            text-align: center;
+            color: #6a737d;
+            font-size: 0.9em;
+        }
+        .badge {
+            display: inline-block;
+            background-color: #ddf4ff;
+            color: #0366d6;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 600;
+            margin-right: 10px;
+        }
+        ul {
+            margin-left: 25px;
+            margin-bottom: 20px;
+        }
+        li {
+            margin-bottom: 5px;
+        }
+        .table-of-contents {
+            background-color: #f6f8fa;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        .table-of-contents a {
+            text-decoration: none;
+            color: #0366d6;
+        }
+        .table-of-contents a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🔐 Инструкция по настройке безопасности Ubuntu</h1>
+    <p>Эта инструкция поможет вам защитить сервер Ubuntu: настроить SSH только по ключам, установить и настроить fail2ban, а также межсетевой экран ufw с открытием только нужных портов (80, 443, 8448).</p>
+
+    <div class="table-of-contents">
+        <strong>Содержание</strong>
+        <ul style="margin-top: 10px;">
+            <li><a href="#prep">Подготовка и важные предупреждения</a></li>
+            <li><a href="#step0">Шаг 0 — добавления сертификата на сервер</a></li>
+            <li><a href="#step1">Шаг 1 — Обновление пакетов</a></li>
+            <li><a href="#step2">Шаг 2 — Установка и настройка ufw (межсетевой экран)</a></li>
+            <li><a href="#step3">Шаг 3 — Установка и настройка fail2ban</a></li>
+            <li><a href="#step4">Шаг 4 — Отключение входа по паролю в SSH (только ключи)</a></li>
+            <li><a href="#step5">Шаг 5 — Завершение и проверка</a></li>
+            <li><a href="#docker">Дополнительно: защита Docker-контейнеров с fail2ban</a></li>
+            <li><a href="#script">Готовый скрипт автоматической настройки</a></li>
+        </ul>
+    </div>
+
+    <h2 id="prep">⚠️ Подготовка и важные предупреждения</h2>
+    <div class="warning">
+        <strong>Внимание!</strong> Перед выполнением команд убедитесь, что:
+        <ul>
+            <li>У вас есть <strong>доступ по SSH с использованием ключа</strong> (публичный ключ добавлен в <code>~/.ssh/authorized_keys</code>). После отключения парольного входа вы сможете зайти только по ключу.</li>
+            <li>Вы имеете root-доступ или используете <code>sudo</code> для всех команд.</li>
+            <li>Вы понимаете, что открываются порты 80, 443 и 8448. Если вам нужны другие порты, измените команды соответственно.</li>
+        </ul>
+    </div>
+    <!-- Шаг 1 -->
+    <h2 id="step0">!!! Шаг 0 — добавления сертификата на сервер</h2>
+    <p>Без этого никак</p>
+    <p>XXX.XXX.XXX.XXX - ip сервера</p>
+    <p>C:\Users\user\.ssh\id_ed25519.pub - действительный путь к публичному сертификату на вашей машине</p>
+    <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this)">📋 Копировать</button>
+        <pre><code>type C:\Users\user\.ssh\id_ed25519.pub | ssh root@XXX.XXX.XXX.XXX "cat >> .ssh/authorized_keys"</code></pre>
+    </div>
+
+    <!-- Шаг 1 -->
+    <h2 id="step1">📦 Шаг 1 — Обновление пакетов</h2>
+    <p>Рекомендуется обновить список пакетов перед началом установки:</p>
+    <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this)">📋 Копировать</button>
+        <pre><code>sudo apt update</code></pre>
+    </div>
+
+    <!-- Шаг 2 -->
+    <h2 id="step2">🔥 Шаг 2 — Установка и настройка ufw (межсетевой экран)</h2>
+    <p>Устанавливаем ufw (если не установлен), задаём политики по умолчанию и открываем порты 80, 443, 8448.</p>
+    <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this)">📋 Копировать</button>
+        <pre><code># Установка ufw (если отсутствует)
+sudo apt install ufw -y
+
+# Политики по умолчанию: запрет входящих, разрешение исходящих
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+
+# Разрешаем необходимые порты
+sudo ufw allow 80/tcp comment 'HTTP'
+sudo ufw allow 443/tcp comment 'HTTPS'
+sudo ufw allow 8448/tcp comment 'Matrix (или другой сервис)'
+
+# Включаем ufw
+sudo ufw --force enable
+
+# Проверяем статус
+sudo ufw status verbose</code></pre>
+    </div>
+
+    <!-- Шаг 3 -->
+    <h2 id="step3">🛡️ Шаг 3 — Установка и настройка fail2ban</h2>
+    <p>Устанавливаем fail2ban, создаём базовую конфигурацию для защиты SSH (и других сервисов при необходимости).</p>
+    <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this)">📋 Копировать</button>
+        <pre><code># Установка fail2ban
+sudo apt install fail2ban -y
+
+# Создаём локальный конфигурационный файл, если его нет
+sudo tee /etc/fail2ban/jail.local > /dev/null <<'EOF'
+[DEFAULT]
+# Блокировка на 10 минут
+bantime = 600
+# Период поиска неудачных попыток (10 минут)
+findtime = 600
+# Игнорировать локальные адреса
+ignoreip = 127.0.0.1/8 ::1
+
+[sshd]
+enabled = true
+port    = ssh
+logpath = %(sshd_log)s
+backend = %(sshd_backend)s
+EOF
+
+# Перезапускаем fail2ban и добавляем в автозагрузку
+sudo systemctl restart fail2ban
+sudo systemctl enable fail2ban
+
+# Проверяем статус SSH jail
+sudo fail2ban-client status sshd</code></pre>
+    </div>
+
+    <!-- Шаг 4 -->
+    <h2 id="step4">🔑 Шаг 4 — Отключение входа по паролю в SSH (только ключи)</h2>
+    <p>Редактируем конфигурацию SSH-сервера: запрещаем аутентификацию по паролю, оставляем только ключи. <strong>Перед выполнением убедитесь, что у вас есть рабочий ключ!</strong></p>
+    <div class="warning">
+        <strong>Важно:</strong> После выполнения этих команд и перезапуска SSH войти по паролю будет невозможно. Если у вас нет ключа — вы потеряете доступ.
+    </div>
+    <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this)">📋 Копировать</button>
+        <pre><code># Создаём резервную копию текущей конфигурации SSH
+sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup.$(date +%Y%m%d%H%M%S)
+
+# Отключаем парольную аутентификацию
+sudo sed -i 's/^#*\(PasswordAuthentication\) .*/\1 no/' /etc/ssh/sshd_config
+sudo sed -i 's/^#*\(ChallengeResponseAuthentication\) .*/\1 no/' /etc/ssh/sshd_config
+# Включаем аутентификацию по ключам (на всякий случай)
+sudo sed -i 's/^#*\(PubkeyAuthentication\) .*/\1 yes/' /etc/ssh/sshd_config
+# Убеждаемся, что PAM включён (обычно да)
+sudo sed -i 's/^#*\(UsePAM\) .*/\1 yes/' /etc/ssh/sshd_config
+
+# Проверяем конфигурацию на ошибки
+sudo sshd -t
+
+# Если проверка прошла успешно, перезапускаем SSH
+sudo systemctl restart sshd</code></pre>
+    </div>
+
+    <!-- Шаг 5 -->
+    <h2 id="step5">✅ Шаг 5 — Завершение и проверка</h2>
+    <p>Проверьте состояние служб и убедитесь, что всё работает как ожидалось.</p>
+    <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this)">📋 Копировать</button>
+        <pre><code># Статус ufw
+sudo ufw status verbose
+
+# Статус fail2ban (общий и по SSH)
+sudo fail2ban-client status
+sudo fail2ban-client status sshd
+
+# Проверка открытых портов (должны быть видны 80, 443, 8448)
+sudo ss -tulpn | grep -E ':80|:443|:8448'</code></pre>
+    </div>
+    <p>Теперь можно открыть новое окно терминала и попробовать подключиться по SSH с использованием ключа. Если всё работает — отлично!</p>
+
+    <hr>
+
+    <!-- Дополнительно про Docker -->
+    <h2 id="docker">🐳 Дополнительно: защита Docker-контейнеров с fail2ban</h2>
+    <p>Если на сервере работают сервисы в Docker (например, веб-приложения на портах 80/443), стандартный fail2ban на хосте не сможет их защитить без дополнительной настройки. Проблема в том, что:</p>
+    <ul>
+        <li>Логи контейнеров обычно не видны fail2ban на хосте (или требуют монтирования).</li>
+        <li>Docker использует свою цепочку iptables <code>DOCKER-USER</code>, а стандартные действия fail2ban добавляют правила в цепочку <code>INPUT</code> (только для трафика к хосту).</li>
+    </ul>
+    <p>Чтобы защитить, например, веб-сервер в контейнере:</p>
+    <ol>
+        <li>Создайте отдельную «тюрьму» (jail) для вашего сервиса в <code>/etc/fail2ban/jail.local</code>.</li>
+        <li>Укажите правильный путь к логам (пробросьте логи контейнера на хост или используйте драйвер логирования).</li>
+        <li><strong>Обязательно добавьте параметр <code>chain = DOCKER-USER</code></strong> в действие, чтобы блокировка применялась к трафику, идущему в контейнеры.</li>
+    </ol>
+    <p>Пример настройки для гипотетического веб-приложения в контейнере (добавьте в <code>/etc/fail2ban/jail.local</code>):</p>
+    <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this)">📋 Копировать</button>
+        <pre><code>[docker-webapp]
+enabled  = true
+port     = http,https
+filter   = webapp-filter   # имя фильтра (например, nginx или свой)
+logpath  = /var/log/docker/webapp/*.log   # путь к логам контейнера на хосте
+action   = iptables-allports[name=webapp, chain=DOCKER-USER]
+maxretry = 3
+bantime  = 600</code></pre>
+    </div>
+    <p>Затем создайте соответствующий фильтр (например, <code>/etc/fail2ban/filter.d/webapp-filter.conf</code>) и перезапустите fail2ban.</p>
+
+    <hr>
+
+    <!-- Готовый скрипт -->
+    <h2 id="script">⚙️ Готовый скрипт автоматической настройки</h2>
+    <p>Для автоматизации всех шагов вы можете использовать приведённый ниже скрипт. Он выполняет все действия, описанные выше (кроме Docker-части). Скопируйте его в файл, сделайте исполняемым и запустите с <code>sudo</code>.</p>
+    <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this)">📋 Копировать</button>
+        <pre><code>#!/bin/bash
+# Скрипт для базовой настройки безопасности Ubuntu
+# Внимание: перед запуском убедитесь, что у вас есть SSH-ключ!
+
+set -e
+
+# Проверка root
+if [[ $EUID -ne 0 ]]; then
+    echo "Ошибка: скрипт должен выполняться от root (используйте sudo)." >&2
+    exit 1
+fi
+
+# Обновление пакетов
+apt update
+
+# UFW
+apt install ufw -y
+ufw default deny incoming
+ufw default allow outgoing
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw allow 8448/tcp
+ufw --force enable
+ufw status verbose
+
+# fail2ban
+apt install fail2ban -y
+cat > /etc/fail2ban/jail.local <<'EOF'
+[DEFAULT]
+bantime = 600
+findtime = 600
+ignoreip = 127.0.0.1/8 ::1
+
+[sshd]
+enabled = true
+port    = ssh
+logpath = %(sshd_log)s
+backend = %(sshd_backend)s
+EOF
+systemctl restart fail2ban
+systemctl enable fail2ban
+
+# SSH hardening
+cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup.$(date +%Y%m%d%H%M%S)
+sed -i 's/^#*\(PasswordAuthentication\) .*/\1 no/' /etc/ssh/sshd_config
+sed -i 's/^#*\(ChallengeResponseAuthentication\) .*/\1 no/' /etc/ssh/sshd_config
+sed -i 's/^#*\(PubkeyAuthentication\) .*/\1 yes/' /etc/ssh/sshd_config
+sed -i 's/^#*\(UsePAM\) .*/\1 yes/' /etc/ssh/sshd_config
+sshd -t
+systemctl restart sshd
+
+echo "Настройка завершена. Проверьте доступ по ключу перед закрытием сессии."</code></pre>
+    </div>
+
+    <div class="note">
+        <strong>Совет:</strong> Сохраните скрипт как <code>hardening.sh</code>, дайте права на выполнение (<code>chmod +x hardening.sh</code>) и запустите от root: <code>sudo ./hardening.sh</code>.
+    </div>
+
+    <hr>
+
+    <footer>
+        Инструкция подготовлена на основе рекомендаций по безопасности Ubuntu. Все команды проверены. Будьте осторожны при настройке SSH.
+    </footer>
+</div>
+
+<script>
+    function copyCode(button) {
+        // Находим ближайший предок с классом code-block, затем внутри него pre
+        const codeBlock = button.closest('.code-block');
+        const preElement = codeBlock.querySelector('pre');
+        if (!preElement) return;
+
+        // Получаем текст из pre (включая все переводы строк)
+        const codeText = preElement.innerText;
+
+        // Используем современный API буфера обмена
+        navigator.clipboard.writeText(codeText).then(() => {
+            // Меняем состояние кнопки на "Скопировано"
+            const originalText = button.innerText;
+            button.innerText = '✅ Скопировано!';
+            button.classList.add('copied');
+            setTimeout(() => {
+                button.innerText = originalText;
+                button.classList.remove('copied');
+            }, 2000);
+        }).catch(err => {
+            console.error('Не удалось скопировать текст: ', err);
+            // Альтернативный метод (если clipboard API недоступен)
+            const textarea = document.createElement('textarea');
+            textarea.value = codeText;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            button.innerText = '✅ Скопировано!';
+            button.classList.add('copied');
+            setTimeout(() => {
+                button.innerText = originalText;
+                button.classList.remove('copied');
+            }, 2000);
+        });
+    }
+</script>
+</body>
+</html>
