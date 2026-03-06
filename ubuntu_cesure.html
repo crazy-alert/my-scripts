@@ -206,6 +206,7 @@ sudo ufw default deny incoming
 sudo ufw default allow outgoing
 
 # Разрешаем необходимые порты
+sudo ufw allow 22/tcp comment 'ssh'
 sudo ufw allow 80/tcp comment 'HTTP'
 sudo ufw allow 443/tcp comment 'HTTPS'
 sudo ufw allow 8448/tcp comment 'Matrix (или другой сервис)'
@@ -267,13 +268,13 @@ sudo sed -i 's/^#*\(ChallengeResponseAuthentication\) .*/\1 no/' /etc/ssh/sshd_c
 # Включаем аутентификацию по ключам (на всякий случай)
 sudo sed -i 's/^#*\(PubkeyAuthentication\) .*/\1 yes/' /etc/ssh/sshd_config
 # Убеждаемся, что PAM включён (обычно да)
-sudo sed -i 's/^#*\(UsePAM\) .*/\1 yes/' /etc/ssh/sshd_config
+sudo grep UsePAM /etc/ssh/sshd_config
 
 # Проверяем конфигурацию на ошибки
 sudo sshd -t
 
 # Если проверка прошла успешно, перезапускаем SSH
-sudo systemctl restart sshd</code></pre>
+sudo systemctl restart ssh</code></pre>
     </div>
 
     <!-- Шаг 5 -->
