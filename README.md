@@ -14,5 +14,8 @@ curl -sSL https://raw.githubusercontent.com/crazy-alert/my-scripts/refs/heads/ma
 ```bash
 bash -c "$(curl -L https://raw.githubusercontent.com/hiddify/hiddify-relay/main/install.sh)"
 ```
-**Ubuntu: настроить SSH только по ключам, установить и настроить fail2ban, а также межсетевой экран ufw**
-https://
+
+**Ubuntu: настроить SSH только по ключам**
+```bash
+bash -c "$(curl -L https://raw.githubusercontent.com/crazy-alert/my-scripts/refs/heads/main/PassOff.sh)"
+```
