@@ -3,6 +3,7 @@ set -euo pipefail
 
 # ============================================================
 # Отключение входа по паролю SSH (с защитой от потери доступа)
+# Поддерживает как классический ssh.service, так и socket activation
 # ============================================================
 
 CONF_DIR="/etc/ssh/sshd_config.d"
@@ -18,16 +19,25 @@ if [[ "${EUID}" -ne 0 ]]; then
     die "Скрипт нужно запускать от root."
 fi
 
-# 2. Проверка, что sshd установлен и управляется systemd
+# 2. Проверка, что sshd установлен
 command -v sshd >/dev/null 2>&1 || die "sshd не найден в PATH."
-systemctl list-unit-files | grep -q '^ssh\.service' \
-    || systemctl list-unit-files | grep -q '^sshd\.service' \
-    || die "Не найден unit ssh.service/sshd.service."
 
-SSH_UNIT="ssh"
-systemctl list-unit-files | grep -q '^ssh\.service' || SSH_UNIT="sshd"
+# 3. Определение unit: socket activation или классическая служба
+SSH_UNIT=""
+if systemctl list-unit-files | grep -q '^ssh\.socket'; then
+    SSH_UNIT="ssh.socket"
+    log "Обнаружена socket-активация SSH (ssh.socket)."
+elif systemctl list-unit-files | grep -q '^ssh\.service'; then
+    SSH_UNIT="ssh.service"
+    log "Обнаружена служба SSH (ssh.service)."
+elif systemctl list-unit-files | grep -q '^sshd\.service'; then
+    SSH_UNIT="sshd.service"
+    log "Обнаружена служба SSH (sshd.service)."
+else
+    die "Не найден unit ssh.socket, ssh.service или sshd.service."
+fi
 
-# 3. Проверка, что у root уже есть authorized_keys с хотя бы одним ключом
+# 4. Проверка, что у root уже есть authorized_keys с хотя бы одним ключом
 if [[ ! -s /root/.ssh/authorized_keys ]]; then
     warn "У root нет непустого /root/.ssh/authorized_keys."
     warn "Если вы отключите вход по паролю, вы можете потерять доступ к серверу!"
@@ -35,13 +45,13 @@ if [[ ! -s /root/.ssh/authorized_keys ]]; then
     [[ "${ans}" == "yes" ]] || die "Отменено пользователем."
 fi
 
-# 4. Резервная копия целевого файла, если он существует
+# 5. Резервная копия целевого файла, если он существует
 if [[ -f "${TARGET_CONF}" ]]; then
     cp -a "${TARGET_CONF}" "${TARGET_CONF}${BACKUP_SUFFIX}"
     log "Создана резервная копия: ${TARGET_CONF}${BACKUP_SUFFIX}"
 fi
 
-# 5. Запись директив в файл с приоритетом выше 50-cloud-init.conf
+# 6. Запись директив в файл с приоритетом выше 50-cloud-init.conf
 cat > "${TARGET_CONF}" <<'EOF'
 # Отключение входа по паролю (сгенерировано PassOff.sh)
 PasswordAuthentication no
@@ -52,7 +62,9 @@ EOF
 chmod 644 "${TARGET_CONF}"
 log "Записан ${TARGET_CONF}"
 
-# 6. Проверка синтаксиса ПЕРЕД перезапуском (только синтаксис, без проверки значений)
+# 7. Проверка синтаксиса ПЕРЕД перезапуском
+#    В режиме socket activation /run/sshd может отсутствовать — создаём
+mkdir -p /run/sshd
 if ! sshd -t; then
     warn "sshd -t обнаружил ошибку синтаксиса. Откатываем изменения."
     if [[ -f "${TARGET_CONF}${BACKUP_SUFFIX}" ]]; then
@@ -64,21 +76,23 @@ if ! sshd -t; then
 fi
 log "Синтаксис sshd корректный."
 
-# 7. Перезапуск SSH
-log "Перезапускаем ${SSH_UNIT}.service ..."
+# 8. Перезапуск SSH
+log "Перезапускаем ${SSH_UNIT} ..."
+systemctl daemon-reload
 systemctl restart "${SSH_UNIT}"
 
-# 8. Финальная проверка ПОСЛЕ перезапуска
+# 9. Финальная проверка ПОСЛЕ перезапуска
 sleep 1
 if ! systemctl is-active --quiet "${SSH_UNIT}"; then
-    warn "Служба ${SSH_UNIT} не активна после перезапуска! Попытка отката..."
+    warn "Unit ${SSH_UNIT} не активен после перезапуска! Попытка отката..."
     if [[ -f "${TARGET_CONF}${BACKUP_SUFFIX}" ]]; then
         mv -f "${TARGET_CONF}${BACKUP_SUFFIX}" "${TARGET_CONF}"
     else
         rm -f "${TARGET_CONF}"
     fi
+    systemctl daemon-reload
     systemctl restart "${SSH_UNIT}" || true
-    die "Служба не запустилась. Изменения откачены."
+    die "Unit не запустился. Изменения откачены."
 fi
 
 if ! sshd -T | grep -qi '^passwordauthentication no$'; then
@@ -90,8 +104,9 @@ if ! sshd -T | grep -qi '^passwordauthentication no$'; then
     else
         rm -f "${TARGET_CONF}"
     fi
+    systemctl daemon-reload
     systemctl restart "${SSH_UNIT}" || true
-    die "Изменения откачены, sshd перезапущен со старой конфигурацией."
+    die "Изменения откачены, SSH перезапущен со старой конфигурацией."
 fi
 
 if ! sshd -T | grep -qi '^kbdinteractiveauthentication no$'; then
