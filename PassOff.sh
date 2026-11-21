@@ -42,7 +42,6 @@ if [[ -f "${TARGET_CONF}" ]]; then
 fi
 
 # 5. Запись директив в файл с приоритетом выше 50-cloud-init.conf
-#    (01- загружается раньше 50-, поэтому правило first-match-wins сработает в нашу пользу)
 cat > "${TARGET_CONF}" <<'EOF'
 # Отключение входа по паролю (сгенерировано PassOff.sh)
 PasswordAuthentication no
@@ -53,7 +52,7 @@ EOF
 chmod 644 "${TARGET_CONF}"
 log "Записан ${TARGET_CONF}"
 
-# 6. Проверка синтаксиса ПЕРЕД перезапуском
+# 6. Проверка синтаксиса ПЕРЕД перезапуском (только синтаксис, без проверки значений)
 if ! sshd -t; then
     warn "sshd -t обнаружил ошибку синтаксиса. Откатываем изменения."
     if [[ -f "${TARGET_CONF}${BACKUP_SUFFIX}" ]]; then
@@ -65,29 +64,11 @@ if ! sshd -t; then
 fi
 log "Синтаксис sshd корректный."
 
-# 7. Проверка фактически действующей конфигурации (до перезапуска)
-if ! sshd -T | grep -qi '^passwordauthentication no$'; then
-    warn "После записи конфигурации sshd -T всё ещё показывает passwordauthentication yes."
-    warn "Возможно, есть ещё один файл в ${CONF_DIR} с более высоким приоритетом."
-    warn "Проверьте: grep -r -i passwordauthentication /etc/ssh/sshd_config.d/"
-    if [[ -f "${TARGET_CONF}${BACKUP_SUFFIX}" ]]; then
-        mv -f "${TARGET_CONF}${BACKUP_SUFFIX}" "${TARGET_CONF}"
-    else
-        rm -f "${TARGET_CONF}"
-    fi
-    die "Изменения откачены, sshd не перезапускался."
-fi
-
-if ! sshd -T | grep -qi '^kbdinteractiveauthentication no$'; then
-    warn "KbdInteractiveAuthentication не отключён — вход по паролю через PAM может остаться."
-    warn "Проверьте конфигурацию вручную."
-fi
-
-# 8. Перезапуск SSH
+# 7. Перезапуск SSH
 log "Перезапускаем ${SSH_UNIT}.service ..."
 systemctl restart "${SSH_UNIT}"
 
-# 9. Финальная проверка
+# 8. Финальная проверка ПОСЛЕ перезапуска
 sleep 1
 if ! systemctl is-active --quiet "${SSH_UNIT}"; then
     warn "Служба ${SSH_UNIT} не активна после перезапуска! Попытка отката..."
@@ -98,6 +79,24 @@ if ! systemctl is-active --quiet "${SSH_UNIT}"; then
     fi
     systemctl restart "${SSH_UNIT}" || true
     die "Служба не запустилась. Изменения откачены."
+fi
+
+if ! sshd -T | grep -qi '^passwordauthentication no$'; then
+    warn "После перезапуска sshd -T всё ещё показывает passwordauthentication yes."
+    warn "Возможно, есть ещё один файл в ${CONF_DIR} с более высоким приоритетом."
+    warn "Проверьте: grep -r -i passwordauthentication /etc/ssh/sshd_config.d/"
+    if [[ -f "${TARGET_CONF}${BACKUP_SUFFIX}" ]]; then
+        mv -f "${TARGET_CONF}${BACKUP_SUFFIX}" "${TARGET_CONF}"
+    else
+        rm -f "${TARGET_CONF}"
+    fi
+    systemctl restart "${SSH_UNIT}" || true
+    die "Изменения откачены, sshd перезапущен со старой конфигурацией."
+fi
+
+if ! sshd -T | grep -qi '^kbdinteractiveauthentication no$'; then
+    warn "KbdInteractiveAuthentication не отключён — вход по паролю через PAM может остаться."
+    warn "Проверьте конфигурацию вручную."
 fi
 
 log "Готово. Вход по паролю отключён."
